@@ -31,29 +31,35 @@ commands:
 
 jobs:
   analysis:
-    - checkout
-    - restore_go_cache
-    - run: make analysis
-    - save_dep_cache
+    executor: default
+    steps:
+      - checkout
+      - restore_go_cache
+      - run: make analysis
+      - save_dep_cache
   test:
-    - checkout
-    - restore_go_cache
-    - run: make test
-    - save_go_cache
+    executor: default
+    steps:
+      - checkout
+      - restore_go_cache
+      - run: make test
+      - save_go_cache
   build:
-    - checkout
-    - restore_go_cache
-    - run: curl -sL https://git.io/goreleaser | bash
-    - run: goreleaser
+    executor: default
+    steps:
+      - checkout
+      - restore_go_cache
+      - run: curl -sL https://git.io/goreleaser | bash
+      - run: goreleaser
 workflows:
   version: 2
   flow:
     jobs:
       - analysis
       - test
-      - build
-        filters:
-          branches:
-            ignore: /.*/
-          tags:
-            only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+      - build:
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
