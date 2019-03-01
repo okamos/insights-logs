@@ -3,6 +3,10 @@ setup:
 	dep version > /dev/null || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
 	dep check || dep ensure
 
+build:
+	go fmt ./...
+	GOOS=$(PLATFORM) GOARCH=$(GOARCH) go build -o ezinsights cmd/ezinsigths/main.go
+
 ## Analysis exec vet and lint
 analysis: setup
 	go vet ./...
@@ -13,4 +17,4 @@ analysis: setup
 test: setup
 	go test -race ./...
 
-.PHONY: setup analysis test
+.PHONY: setup build analysis test

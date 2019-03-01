@@ -1,10 +1,11 @@
-package main
+package ezinsights
 
 import (
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -12,11 +13,18 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"github.com/briandowns/spinner"
+	homedir "github.com/mitchellh/go-homedir"
 )
 
-func main() {
+var (
+	configFilePath string
+)
+
+// Run command
+func Run() int {
 	var (
 		showVersion  bool
+		init         bool
 		relativeTime time.Duration
 		group        string
 		query        string
@@ -27,15 +35,24 @@ func main() {
 		fmt.Print(err)
 	}
 	flag.BoolVar(&showVersion, "version", false, "show application version")
+	flag.BoolVar(&init, "init", false, "initialize")
 	flag.DurationVar(&relativeTime, "t", 0, "relative time ex. 5m(5minutes, 1h(1hour), 72h(3days)")
 	flag.StringVar(&group, "g", "", "log group name")
 	flag.StringVar(&query, "q", "", "query string see #https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/logs/CWL_QuerySyntax.html")
 	flag.Parse()
 	svc := cloudwatchlogs.New(sess)
+	if init {
+		err := initialize()
+		if err != nil {
+			log.Print(err)
+			return 1
+		}
+		return 0
+	}
 	if group == "" {
 		// error
 		log.Print("log group name required(-g option) ")
-		os.Exit(1)
+		return 1
 	}
 	params := cloudwatchlogs.StartQueryInput{
 		LogGroupName: &group,
@@ -51,7 +68,7 @@ func main() {
 	resp, err := svc.StartQuery(&params)
 	if err != nil {
 		log.Print(err)
-		os.Exit(1)
+		return 1
 	}
 
 	var stopCh chan struct{}
@@ -74,7 +91,7 @@ Out:
 			})
 			if err != nil {
 				log.Print(err)
-				os.Exit(1)
+				return 1
 			}
 			if *output.Status != "Running" {
 				s.FinalMSG = ""
@@ -93,4 +110,43 @@ Out:
 			}
 		}
 	}
+
+	return 0
+}
+
+func initialize() error {
+	if _, err := os.Stat(configFilePath); !os.IsNotExist(err) {
+		return nil
+	}
+	f, err := os.OpenFile(configFilePath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.Write([]byte(`{
+	"log_froup_name": "/YOUR_LOG_GROUP",
+	"default_relative_time": "15m",
+	"default_query_string": "fields @timestamp, @message | sort @timestamp desc | limit 20"
+}`))
+	return err
+}
+
+func init() {
+	var configRoot string
+	xdgConfig := os.Getenv("XDG_CONFIG_HOME")
+	if xdgConfig == "" {
+		dir, err := homedir.Dir()
+		if err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		configRoot = dir
+	} else {
+		configRoot = xdgConfig
+	}
+	if err := os.MkdirAll(filepath.Join(configRoot, "ezinsights"), 0755); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+	configFilePath = filepath.Join(configRoot, "ezinsights", "config.json")
 }
