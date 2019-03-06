@@ -1,8 +1,10 @@
 package ezinsights
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -28,19 +30,18 @@ func Run() int {
 		relativeTime time.Duration
 		group        string
 		query        string
+		queryString  string
+		qs           string
 	)
 
-	sess, err := session.NewSession(&aws.Config{})
-	if err != nil {
-		fmt.Print(err)
-	}
 	flag.BoolVar(&showVersion, "version", false, "show application version")
 	flag.BoolVar(&init, "init", false, "initialize")
 	flag.DurationVar(&relativeTime, "t", 0, "relative time ex. 5m(5minutes, 1h(1hour), 72h(3days)")
 	flag.StringVar(&group, "g", "", "log group name")
-	flag.StringVar(&query, "q", "", "query string see #https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/logs/CWL_QuerySyntax.html")
+	flag.StringVar(&query, "q", "", "one or more query commands. If there is a query in the configuration file, it is added to the query in the configuration file")
+	flag.StringVar(&qs, "qs", "", "query string see #https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/logs/CWL_QuerySyntax.html. the option ignores query in the configuration")
 	flag.Parse()
-	svc := cloudwatchlogs.New(sess)
+
 	if init {
 		err := initialize()
 		if err != nil {
@@ -49,22 +50,48 @@ func Run() int {
 		}
 		return 0
 	}
-	if group == "" {
+
+	option, err := load()
+	if err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+
+	sess, err := session.NewSession(&aws.Config{Region: aws.String(option.Region)})
+	if err != nil {
+		fmt.Print(err)
+	}
+
+	svc := cloudwatchlogs.New(sess)
+
+	if group != "" {
+		option.LogGroupName = group
+	}
+	if relativeTime != 0 {
+		option.Time = relativeTime
+	}
+	if option.Time != 0 {
+		now := time.Now()
+		option.Start = now.Add(-option.Time).Unix()
+		option.End = now.Unix()
+	}
+	queryString = option.Query.Build(query)
+	if qs != "" {
+		queryString = qs
+	}
+
+	if option.LogGroupName == "" {
 		// error
 		log.Print("log group name required(-g option) ")
 		return 1
 	}
 	params := cloudwatchlogs.StartQueryInput{
-		LogGroupName: &group,
-		QueryString:  &query,
+		LogGroupName: &option.LogGroupName,
+		QueryString:  &queryString,
+		StartTime:    &option.Start,
+		EndTime:      &option.End,
 	}
-	if relativeTime != 0 {
-		now := time.Now()
-		s := now.Add(-relativeTime).Unix()
-		e := now.Unix()
-		params.StartTime = &s
-		params.EndTime = &e
-	}
+
 	resp, err := svc.StartQuery(&params)
 	if err != nil {
 		log.Print(err)
@@ -116,6 +143,7 @@ Out:
 
 func initialize() error {
 	if _, err := os.Stat(configFilePath); !os.IsNotExist(err) {
+		log.Printf("%s already exists", configFilePath)
 		return nil
 	}
 	f, err := os.OpenFile(configFilePath, os.O_RDWR|os.O_CREATE, 0644)
@@ -123,12 +151,16 @@ func initialize() error {
 		return err
 	}
 	defer f.Close()
-	_, err = f.Write([]byte(`{
-	"log_froup_name": "/YOUR_LOG_GROUP",
-	"default_relative_time": "15m",
-	"default_query_string": "fields @timestamp, @message | sort @timestamp desc | limit 20"
-}`))
-	return err
+	b, err := json.MarshalIndent(DefaultOption(), "", "  ")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	if err != nil {
+		return err
+	}
+	log.Printf("initialize file is created: %s.\nPlease edit the file.", configFilePath)
+	return nil
 }
 
 func init() {
@@ -149,4 +181,17 @@ func init() {
 		os.Exit(1)
 	}
 	configFilePath = filepath.Join(configRoot, "ezinsights", "config.json")
+}
+
+func load() (Option, error) {
+	option := Option{}
+	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
+		return option, nil
+	}
+	b, err := ioutil.ReadFile(configFilePath)
+	if err != nil {
+		return option, err
+	}
+	err = json.Unmarshal(b, &option)
+	return option, err
 }
