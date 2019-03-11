@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -27,6 +28,7 @@ func Run() int {
 	var (
 		showVersion  bool
 		init         bool
+		edit         bool
 		relativeTime time.Duration
 		group        string
 		query        string
@@ -36,6 +38,7 @@ func Run() int {
 
 	flag.BoolVar(&showVersion, "version", false, "show application version")
 	flag.BoolVar(&init, "init", false, "initialize")
+	flag.BoolVar(&edit, "e", false, "edit configuration file")
 	flag.DurationVar(&relativeTime, "t", 0, "relative time ex. 5m(5minutes, 1h(1hour), 72h(3days)")
 	flag.StringVar(&group, "g", "", "log group name")
 	flag.StringVar(&query, "q", "", "one or more query commands. If there is a query in the configuration file, it is added to the query in the configuration file")
@@ -50,11 +53,19 @@ func Run() int {
 		}
 		return 0
 	}
+	if edit {
+		err := editFile()
+		if err != nil {
+			log.Print(err)
+			return 1
+		}
+		return 0
+	}
 
 	option, err := load()
 	if err != nil {
 		log.Print(err)
-		os.Exit(1)
+		return 1
 	}
 
 	sess, err := session.NewSession(&aws.Config{Region: aws.String(option.Region)})
@@ -161,6 +172,20 @@ func initialize() error {
 	}
 	log.Printf("initialize file is created: %s.\nPlease edit the file.", configFilePath)
 	return nil
+}
+
+func editFile() error {
+	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
+		log.Printf("%s not exists, please run --init option", configFilePath)
+		return nil
+	}
+	editor := os.Getenv("EDITOR")
+
+	cmd := exec.Command(editor, configFilePath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func init() {
