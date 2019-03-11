@@ -29,6 +29,7 @@ func Run() int {
 		showVersion  bool
 		init         bool
 		edit         bool
+		silent       bool
 		relativeTime time.Duration
 		group        string
 		query        string
@@ -41,6 +42,7 @@ func Run() int {
 	flag.BoolVar(&edit, "e", false, "edit configuration file")
 	flag.DurationVar(&relativeTime, "t", 0, "relative time ex. 5m(5minutes, 1h(1hour), 72h(3days)")
 	flag.StringVar(&group, "g", "", "log group name")
+	flag.BoolVar(&silent, "s", false, "disable progress")
 	flag.StringVar(&query, "q", "", "one or more query commands. If there is a query in the configuration file, it is added to the query in the configuration file")
 	flag.StringVar(&qs, "qs", "", "query string see #https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/logs/CWL_QuerySyntax.html. the option ignores query in the configuration")
 	flag.Parse()
@@ -90,6 +92,9 @@ func Run() int {
 	if qs != "" {
 		queryString = qs
 	}
+	if silent {
+		option.Silent = silent
+	}
 
 	if option.LogGroupName == "" {
 		// error
@@ -109,14 +114,19 @@ func Run() int {
 		return 1
 	}
 
-	var stopCh chan struct{}
+	var (
+		stopCh chan struct{}
+		s      *spinner.Spinner
+	)
 	t := time.NewTicker(time.Millisecond * 500)
 	defer t.Stop()
 	count := 0
-	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	s.Suffix = " Retrieve insights data"
-	s.Start()
-	defer s.Stop()
+	if !silent {
+		s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+		s.Suffix = " Retrieve insights data"
+		s.Start()
+		defer s.Stop()
+	}
 Out:
 	for {
 		select {
@@ -132,15 +142,27 @@ Out:
 				return 1
 			}
 			if *output.Status != "Running" {
-				s.FinalMSG = ""
-				s.Stop()
-				for _, result := range output.Results {
+				if !silent {
+					s.FinalMSG = ""
+					s.Stop()
+				}
+				fmt.Print("[")
+				max := len(output.Results) - 1
+				for i, result := range output.Results {
+					sep := ","
+					if i == max {
+						sep = ""
+					}
+					prefix := "{"
 					for _, raw := range result {
-						if strings.Index(*raw.Field, "@message") != -1 {
-							log.Print(*raw.Field + ":" + *raw.Value)
+						if strings.Index(*raw.Field, "@ptr") == -1 {
+							fmt.Printf(`%s%q:%q`, prefix, *raw.Field, *raw.Value)
+							prefix = ", "
 						}
 					}
+					fmt.Printf("}%s\n", sep)
 				}
+				fmt.Print("]")
 				break Out
 			}
 			if count >= 20 {

@@ -13,6 +13,7 @@ type Option struct {
 	End          int64         `json:"end_time"`
 	Time         time.Duration `json:"relative_time"`
 	Query        Query         `json:"query"`
+	Silent       bool          `json:"silent"`
 }
 
 // Query used for build CloudWatch Logs Insights Insights Query
@@ -52,5 +53,6 @@ func DefaultOption() Option {
 			Sort:   "@timestamp desc",
 			Limit:  20,
 		},
+		Silent: false,
 	}
 }
