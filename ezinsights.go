@@ -146,7 +146,7 @@ Out:
 					s.FinalMSG = ""
 					s.Stop()
 				}
-				fmt.Print("[")
+				fmt.Print(`{"data":[`)
 				max := len(output.Results) - 1
 				for i, result := range output.Results {
 					sep := ","
@@ -162,7 +162,9 @@ Out:
 					}
 					fmt.Printf("}%s\n", sep)
 				}
-				fmt.Print("]")
+				stats := *output.Statistics
+				fmt.Printf(`],"statistics":{"scanned_bytes":"%g","matched_records":"%g","scanned_records":"%g"}}`,
+					*stats.BytesScanned, *stats.RecordsMatched, *stats.RecordsScanned)
 				break Out
 			}
 			if count >= 20 {
