@@ -32,6 +32,8 @@ func Run() int {
 		silent       bool
 		relativeTime time.Duration
 		group        string
+		startTime    string
+		endTime      string
 		query        string
 		queryString  string
 		qs           string
@@ -43,6 +45,8 @@ func Run() int {
 	flag.DurationVar(&relativeTime, "t", 0, "relative time ex. 5m(5minutes, 1h(1hour), 72h(3days)")
 	flag.StringVar(&group, "g", "", "log group name")
 	flag.BoolVar(&silent, "s", false, "disable progress")
+	flag.StringVar(&startTime, "st", "", "The  beginning  of the time range to query. This is formatted by RFC3339")
+	flag.StringVar(&endTime, "et", "", "The end of the time range to query.. This is formatted by RFC3339")
 	flag.StringVar(&query, "q", "", "one or more query commands. If there is a query in the configuration file, it is added to the query in the configuration file")
 	flag.StringVar(&qs, "qs", "", "query string see #https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/logs/CWL_QuerySyntax.html. the option ignores query in the configuration")
 	flag.Parse()
@@ -94,6 +98,22 @@ func Run() int {
 	}
 	if silent {
 		option.Silent = silent
+	}
+	if startTime != "" {
+		start, err := time.Parse(time.RFC3339, startTime)
+		if err != nil {
+			log.Print(err)
+			return 1
+		}
+		option.Start = start.Unix()
+	}
+	if endTime != "" {
+		end, err := time.Parse(time.RFC3339, endTime)
+		if err != nil {
+			log.Print(err)
+			return 1
+		}
+		option.End = end.Unix()
 	}
 
 	if option.LogGroupName == "" {
