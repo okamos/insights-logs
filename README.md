@@ -2,5 +2,5 @@
 
 ## Install
 ```bash
-go get -u github.com/okamos/insights-logs/cmd/ezinsigths
+go get -u github.com/okamos/insights-logs/cmd/ezinsights
 ```
