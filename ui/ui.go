@@ -15,17 +15,6 @@ var (
 	selector Selector
 )
 
-func redrawAll() {
-	w, h := termbox.Size()
-	termbox.Clear(coldef, coldef)
-
-	tbPrint(0, 0, coldef, coldef, help)
-	ib.Draw(helpLen, 0, w, 0)
-	selector.Draw(0, 1, w, h-1)
-
-	termbox.Flush()
-}
-
 func tbFill(y, w int, bg termbox.Attribute) {
 	for x := 0; x < w; x++ {
 		termbox.SetCell(x, y, ' ', coldef, bg)
@@ -36,6 +25,26 @@ func tbPrint(x, y int, fg, bg termbox.Attribute, msg string) {
 	for _, c := range msg {
 		termbox.SetCell(x, y, c, fg, bg)
 		x++
+	}
+}
+
+func tbBox(x1, y1, x2, y2 int, title string) {
+	if x1 > x2 || y1 > y2 {
+		return
+	}
+
+	for i := x1; i <= x2; i++ {
+		termbox.SetCell(i, y1, '-', coldef, coldef)
+		termbox.SetCell(i, y2, '-', coldef, coldef)
+	}
+	for i := y1 + 1; i < y2; i++ {
+		termbox.SetCell(x1, i, '|', coldef, coldef)
+		termbox.SetCell(x2, i, '|', coldef, coldef)
+	}
+	if title != "" {
+		for i, r := range title {
+			termbox.SetCell(x1+i+3, y1, r, coldef, coldef)
+		}
 	}
 }
 
@@ -95,9 +104,7 @@ func InitSelector(values []string) {
 }
 
 func init() {
-	ib = InputBox{
-		initX: helpLen,
-	}
+	ib = InputBox{}
 	selector = Selector{
 		index: 0,
 	}

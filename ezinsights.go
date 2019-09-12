@@ -2,6 +2,7 @@ package ezinsights
 
 import (
 	"flag"
+	"fmt"
 	"time"
 
 	"github.com/okamos/insights-logs/ui"
@@ -28,6 +29,7 @@ func Run() int {
 
 	err := ui.Draw(version)
 	if err != nil {
+		fmt.Print(err)
 		return 1
 	}
 	return 0

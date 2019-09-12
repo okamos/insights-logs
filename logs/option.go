@@ -57,7 +57,7 @@ func LoadOption() (Option, error) {
 	if _, err := os.Stat(configFilePath); os.IsNotExist(err) {
 		// default option
 		return Option{
-			Profile:      "",
+			Profile:      "default",
 			Region:       "us-west-2",
 			LogGroupName: "/YOUR_LOG_GROUP_NAME_HERE",
 			Time:         time.Hour,
@@ -77,13 +77,13 @@ func LoadOption() (Option, error) {
 }
 
 // Save to JSON
-func Save(option Option) error {
-	f, err := os.OpenFile(configFilePath, os.O_RDWR|os.O_CREATE, 0644)
+func (o Option) Save() error {
+	f, err := os.OpenFile(configFilePath, os.O_TRUNC|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	b, err := json.MarshalIndent(option, "", "  ")
+	b, err := json.MarshalIndent(o, "", "  ")
 	if err != nil {
 		return err
 	}
