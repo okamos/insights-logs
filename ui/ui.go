@@ -5,9 +5,7 @@ import (
 )
 
 const (
-	coldef  = termbox.ColorDefault
-	help    = "[ESC] QUIT | Filter > "
-	helpLen = len(help)
+	coldef = termbox.ColorDefault
 )
 
 var (
