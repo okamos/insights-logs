@@ -15,6 +15,7 @@ var (
 const (
 	base = iota
 	profile
+	region
 	logGroup
 )
 
@@ -33,6 +34,13 @@ func redrawBase() {
 		ib.InitX = w / 4
 		ib.Draw(w/4, h/2, w-w/4)
 		tbPrint(0, h-2, termbox.Attribute(5), coldef, "Enter: change the profile | Ctrl-C: cancel")
+	case region:
+		tbPrint(0, 3, coldef, coldef, "Filtering regions")
+		tbPrint(0, 4, coldef, coldef, ">")
+		ib.InitX = 2
+		ib.Draw(2, 4, 0)
+		selector.Draw(0, 5, w, h-7)
+		tbPrint(0, h-2, termbox.Attribute(5), coldef, "Enter: change the region | Ctrl-C: cancel")
 	case logGroup:
 		tbPrint(0, 3, coldef, coldef, "Filtering log groups")
 		tbPrint(0, 4, coldef, coldef, ">")
@@ -43,7 +51,7 @@ func redrawBase() {
 	}
 
 	// HELP
-	tbPrint(0, h-1, termbox.Attribute(5), coldef, "p: change profile | g: change log group")
+	tbPrint(0, h-1, termbox.Attribute(5), coldef, "p: change profile | r: change region | g: change log group")
 	termbox.Flush()
 }
 
@@ -74,7 +82,7 @@ func Draw(v string) error {
 			switch ev.Key {
 			case termbox.KeyEsc, termbox.KeyCtrlC:
 				switch mode {
-				case profile, logGroup:
+				case profile, logGroup, region:
 					ib.removeRune()
 					mode = base
 				default:
@@ -121,13 +129,36 @@ func Draw(v string) error {
 					}
 					if len(logGroups) > 0 {
 						option.LogGroupName = logGroups[0]
-					}
-					err = option.Save()
-					if err != nil {
-						return err
+						err = option.Save()
+						if err != nil {
+							return err
+						}
 					}
 					mode = base
 					ib.clearText()
+				case region:
+					r := selector.selected()
+					if r != "" {
+						option.Region = r
+						err = logs.SetService(option.Region, option.Profile)
+						if err != nil {
+							return err
+						}
+						logGroups, err = logs.LogGroups("")
+						if err != nil {
+							return err
+						}
+						if len(logGroups) > 0 {
+							option.LogGroupName = logGroups[0]
+							err = option.Save()
+							if err != nil {
+								return err
+							}
+						}
+						ib.clearText()
+						InitSelector([]string{})
+					}
+					mode = base
 				case logGroup:
 					g := selector.selected()
 					if g != "" {
@@ -136,17 +167,17 @@ func Draw(v string) error {
 						if err != nil {
 							return err
 						}
-						mode = base
 						ib.clearText()
 						InitSelector([]string{})
 					}
+					mode = base
 				}
 			default:
 				switch mode {
-				case profile, logGroup:
+				case profile, region, logGroup:
 					if ev.Ch != 0 {
 						ib.addRune(ev.Ch)
-						if mode == logGroup {
+						if mode == region || mode == logGroup {
 							selector.filter(string(ib.runes))
 						}
 					}
@@ -154,6 +185,9 @@ func Draw(v string) error {
 					switch ev.Ch {
 					case 'p':
 						mode = profile
+					case 'r':
+						InitSelector(regions)
+						mode = region
 					case 'g':
 						if len(logGroups) == 0 {
 							logGroups, err = logs.LogGroups("")

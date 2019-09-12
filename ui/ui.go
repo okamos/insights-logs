@@ -11,6 +11,32 @@ const (
 var (
 	ib       InputBox
 	selector Selector
+	// https://docs.aws.amazon.com/general/latest/gr/rande.html
+	regions = []string{
+		"us-east-2",
+		"us-east-1",
+		"us-west-1",
+		"us-west-2",
+		"ap-east-1",
+		"ap-south-1",
+		"ap-northeast-3",
+		"ap-northeast-2",
+		"ap-southeast-1",
+		"ap-southeast-2",
+		"ap-northeast-1",
+		"ca-central-1",
+		"cn-north-1",
+		"cn-northwest-1",
+		"eu-central-1",
+		"eu-west-1",
+		"eu-west-2",
+		"eu-west-3",
+		"eu-north-1",
+		"me-south-1",
+		"sa-east-1",
+		"us-gov-east-1",
+		"us-gov-west-1",
+	}
 )
 
 func tbFill(y, w int, bg termbox.Attribute) {
@@ -45,55 +71,6 @@ func tbBox(x1, y1, x2, y2 int, title string) {
 		}
 	}
 }
-
-// // Draw the UI
-// func Draw() (string, error) {
-// 	err := termbox.Init()
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	defer termbox.Close()
-// 	termbox.SetInputMode(termbox.InputEsc)
-
-// 	redrawAll()
-// 	for {
-// 		switch ev := termbox.PollEvent(); ev.Type {
-// 		case termbox.EventKey:
-// 			switch ev.Key {
-// 			case termbox.KeyEsc, termbox.KeyCtrlC:
-// 				return "", nil
-// 			case termbox.KeyArrowLeft, termbox.KeyCtrlB:
-// 				ib.moveToLeft()
-// 			case termbox.KeyArrowRight, termbox.KeyCtrlF:
-// 				ib.moveToRight()
-// 			case termbox.KeyBackspace, termbox.KeyBackspace2:
-// 				ib.removeRune()
-// 				selector.filter(string(ib.runes))
-// 			case termbox.KeyDelete, termbox.KeyCtrlU:
-// 				ib.clearText()
-// 				selector.filter("")
-// 			case termbox.KeyArrowUp, termbox.KeyCtrlP:
-// 				selector.moveToUp()
-// 			case termbox.KeyArrowDown, termbox.KeyCtrlN:
-// 				selector.moveToDown()
-// 			case termbox.KeyHome, termbox.KeyCtrlA:
-// 				ib.cursor = 0
-// 			case termbox.KeyEnd, termbox.KeyCtrlE:
-// 				ib.cursor = len(ib.runes)
-// 			case termbox.KeyEnter:
-// 				return selector.selected(), nil
-// 			default:
-// 				if ev.Ch != 0 {
-// 					ib.addRune(ev.Ch)
-// 					selector.filter(string(ib.runes))
-// 				}
-// 			}
-// 		case termbox.EventError:
-// 			return "", ev.Err
-// 		}
-// 		redrawAll()
-// 	}
-// }
 
 // InitSelector set values to selector
 func InitSelector(values []string) {
