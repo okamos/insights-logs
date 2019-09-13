@@ -1,10 +1,15 @@
 package ui
 
 import (
+	"context"
+	"fmt"
 	"math"
+	"math/bits"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	termbox "github.com/nsf/termbox-go"
 	"github.com/okamos/insights-logs/logs"
 )
@@ -13,9 +18,14 @@ var (
 	version        string
 	option         logs.Option
 	mode           = base
+	status         int
 	logGroups      []string
 	optionInternal logs.Option
 	parseErr       error
+	queryErr       error
+	bytesScanned   float64
+	recordsMathced float64
+	recordsScanned float64
 )
 
 const (
@@ -24,6 +34,13 @@ const (
 	region
 	logGroup
 	query
+)
+
+const (
+	waiting = iota
+	running
+	done
+	failed
 )
 
 func redrawBase() {
@@ -36,6 +53,21 @@ func redrawBase() {
 	tbPrint(11, 1, termbox.Attribute(4), coldef, "| version:"+version+" log group:"+option.LogGroupName)
 
 	switch mode {
+	case base:
+		tbPrint(0, 2, termbox.Attribute(6), coldef, "last scan")
+		tbPrint(11, 2, termbox.Attribute(6), coldef, fmt.Sprintf("| %s matched:%d scanned:%d",
+			humanBytes(uint64(bytesScanned)),
+			uint(recordsMathced),
+			uint(recordsScanned),
+		))
+		switch status {
+		case running:
+			tbPrint(0, 3, coldef, coldef, "wait a while...")
+		case done:
+			selector.Draw(0, 3, w, h-5)
+		case failed:
+			tbPrint(0, 3, termbox.ColorRed, coldef, queryErr.Error())
+		}
 	case profile:
 		tbBox(w/4-1, h/2-1, w-w/4+1, h/2+1, coldef, coldef, "Input your profile name")
 		ib.InitX = w / 4
@@ -150,6 +182,25 @@ func Draw(v string) error {
 				ib.cursor = len(ib.runes)
 			case termbox.KeyEnter:
 				switch mode {
+				case base:
+					queryErr = nil
+					bytesScanned = 0
+					recordsMathced = 0
+					recordsScanned = 0
+					status = running
+					redrawBase()
+					output, err := startQuery()
+					if err == nil {
+						status = done
+						stats := *output.Statistics
+						bytesScanned = *stats.BytesScanned
+						recordsMathced = *stats.RecordsMatched
+						recordsScanned = *stats.RecordsScanned
+						InitSelector(getResults(output))
+					} else {
+						status = failed
+						queryErr = err
+					}
 				case profile:
 					option.Profile = string(ib.runes)
 					if option.Profile == "" {
@@ -256,6 +307,41 @@ func Draw(v string) error {
 		}
 		redrawBase()
 	}
+}
+
+func startQuery() (*cloudwatchlogs.GetQueryResultsOutput, error) {
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return logs.StartQuery(ctx, option)
+}
+
+func humanBytes(bytes uint64) string {
+	if bytes < 1024 {
+		return fmt.Sprintf("%d bytes", bytes)
+	}
+
+	base := uint(bits.Len64(bytes) / 10)
+	val := float64(bytes) / float64(uint64(1<<(base*10)))
+	return fmt.Sprintf("%.1f %ciB", val, " KMGTPE"[base])
+}
+
+func getResults(output *cloudwatchlogs.GetQueryResultsOutput) []string {
+	results := []string{}
+	for _, result := range output.Results {
+		var (
+			str string
+			sep = ""
+		)
+		for _, raw := range result {
+			if !strings.Contains(*raw.Field, "@ptr") {
+				str += sep + *raw.Value
+				sep = " | "
+			}
+		}
+		results = append(results, str)
+	}
+	return results
 }
 
 func setQuery(index int) {
