@@ -132,6 +132,8 @@ func Draw(v string) error {
 	redrawBase()
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
+		case termbox.EventResize:
+			redrawBase()
 		case termbox.EventKey:
 			switch ev.Key {
 			case termbox.KeyEsc, termbox.KeyCtrlC:
