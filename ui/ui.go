@@ -76,7 +76,7 @@ func tbBox(x1, y1, x2, y2 int, fg, bg termbox.Attribute, title string) {
 		return
 	}
 
-	for i := x1; i <= x2; i++ {
+	for i := x1 + 1; i < x2; i++ {
 		termbox.SetCell(i, y1, '-', fg, bg)
 		termbox.SetCell(i, y2, '-', fg, bg)
 	}
@@ -84,6 +84,10 @@ func tbBox(x1, y1, x2, y2 int, fg, bg termbox.Attribute, title string) {
 		termbox.SetCell(x1, i, '|', fg, bg)
 		termbox.SetCell(x2, i, '|', fg, bg)
 	}
+	termbox.SetCell(x1, y1, '┌', fg, bg)
+	termbox.SetCell(x1, y2, '└', fg, bg)
+	termbox.SetCell(x2, y1, '┐', fg, bg)
+	termbox.SetCell(x2, y2, '┘', fg, bg)
 	if title != "" {
 		for i, r := range title {
 			termbox.SetCell(x1+i+3, y1, r, fg, bg)
