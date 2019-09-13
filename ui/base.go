@@ -1,15 +1,21 @@
 package ui
 
 import (
+	"math"
+	"strconv"
+	"time"
+
 	termbox "github.com/nsf/termbox-go"
 	"github.com/okamos/insights-logs/logs"
 )
 
 var (
-	version   string
-	option    logs.Option
-	mode      = base
-	logGroups []string
+	version        string
+	option         logs.Option
+	mode           = base
+	logGroups      []string
+	optionInternal logs.Option
+	parseErr       error
 )
 
 const (
@@ -17,6 +23,7 @@ const (
 	profile
 	region
 	logGroup
+	query
 )
 
 func redrawBase() {
@@ -30,28 +37,43 @@ func redrawBase() {
 
 	switch mode {
 	case profile:
-		tbBox(w/4-1, h/2-1, w-w/4+1, h/2+1, "Input your profile name")
+		tbBox(w/4-1, h/2-1, w-w/4+1, h/2+1, coldef, coldef, "Input your profile name")
 		ib.InitX = w / 4
 		ib.Draw(w/4, h/2, w-w/4)
 		tbPrint(0, h-2, termbox.Attribute(5), coldef, "Enter: change the profile | Ctrl-C: cancel")
 	case region:
 		tbPrint(0, 3, coldef, coldef, "Filtering regions")
 		tbPrint(0, 4, coldef, coldef, ">")
-		ib.InitX = 2
 		ib.Draw(2, 4, 0)
 		selector.Draw(0, 5, w, h-7)
 		tbPrint(0, h-2, termbox.Attribute(5), coldef, "Enter: change the region | Ctrl-C: cancel")
 	case logGroup:
 		tbPrint(0, 3, coldef, coldef, "Filtering log groups")
 		tbPrint(0, 4, coldef, coldef, ">")
-		ib.InitX = 2
 		ib.Draw(2, 4, 0)
 		selector.Draw(0, 5, w, h-7)
 		tbPrint(0, h-2, termbox.Attribute(5), coldef, "Enter: change the log group | Ctrl-C: cancel | Ctrl-R: reload current input as prefix")
+	case query:
+		selector.Draw(0, 2, w, len(queries))
+		builded := optionInternal.Query.Build(optionInternal.Additional)
+		height := int(math.Ceil(float64(len(builded)) / float64((w))))
+		for i := 0; i < height; i++ {
+			tbPrint(0, 4+len(queries)+i, coldef, coldef, builded[w*i:])
+		}
+		tbBox(-1, 3+len(queries), w, 3+len(queries)+height+1, termbox.Attribute(4), coldef, "builded query")
+
+		fg := coldef
+		if parseErr != nil {
+			fg = termbox.ColorRed
+		}
+		tbBox(w/4-1, h/2-1, w-w/4+1, h/2+1, fg, coldef, "Edit your settings")
+		ib.InitX = w / 4
+		ib.Draw(w/4, h/2, w-w/4)
+		tbPrint(0, h-2, termbox.Attribute(5), coldef, "Enter: save query | Ctrl-C cancel")
 	}
 
 	// HELP
-	tbPrint(0, h-1, termbox.Attribute(5), coldef, "p: change profile | r: change region | g: change log group")
+	tbPrint(0, h-1, termbox.Attribute(5), coldef, "p: change profile | r: change region | g: change log group | q: change query")
 	termbox.Flush()
 }
 
@@ -82,7 +104,7 @@ func Draw(v string) error {
 			switch ev.Key {
 			case termbox.KeyEsc, termbox.KeyCtrlC:
 				switch mode {
-				case profile, logGroup, region:
+				case profile, logGroup, region, query:
 					ib.removeRune()
 					mode = base
 				default:
@@ -94,10 +116,18 @@ func Draw(v string) error {
 				ib.moveToRight()
 			case termbox.KeyBackspace, termbox.KeyBackspace2:
 				ib.removeRune()
-				selector.filter(string(ib.runes))
+				if mode == query {
+					setQuery(selector.index)
+				} else {
+					selector.filter(string(ib.runes))
+				}
 			case termbox.KeyDelete, termbox.KeyCtrlU:
 				ib.clearText()
-				selector.filter("")
+				if mode == query {
+					setQuery(selector.index)
+				} else {
+					selector.filter("")
+				}
 			case termbox.KeyCtrlR:
 				logGroups, err = logs.LogGroups(string(ib.runes))
 				if err != nil {
@@ -106,8 +136,14 @@ func Draw(v string) error {
 				InitSelector(logGroups)
 			case termbox.KeyArrowUp, termbox.KeyCtrlP:
 				selector.moveToUp()
+				if mode == query {
+					setQueryIB(selector.index)
+				}
 			case termbox.KeyArrowDown, termbox.KeyCtrlN:
 				selector.moveToDown()
+				if mode == query {
+					setQueryIB(selector.index)
+				}
 			case termbox.KeyHome, termbox.KeyCtrlA:
 				ib.cursor = 0
 			case termbox.KeyEnd, termbox.KeyCtrlE:
@@ -171,15 +207,25 @@ func Draw(v string) error {
 						InitSelector([]string{})
 					}
 					mode = base
+				case query:
+					option = optionInternal
+					err = option.Save()
+					if err != nil {
+						return err
+					}
+					ib.clearText()
+					InitSelector([]string{})
+					mode = base
 				}
 			default:
 				switch mode {
-				case profile, region, logGroup:
-					if ev.Ch != 0 {
-						ib.addRune(ev.Ch)
-						if mode == region || mode == logGroup {
-							selector.filter(string(ib.runes))
-						}
+				case profile, region, logGroup, query:
+					ib.addRune(ev.Ch)
+					if mode == region || mode == logGroup {
+						selector.filter(string(ib.runes))
+					}
+					if mode == query {
+						setQuery(selector.index)
 					}
 				default:
 					switch ev.Ch {
@@ -187,8 +233,10 @@ func Draw(v string) error {
 						mode = profile
 					case 'r':
 						InitSelector(regions)
+						ib.InitX = 2
 						mode = region
 					case 'g':
+						ib.InitX = 2
 						if len(logGroups) == 0 {
 							logGroups, err = logs.LogGroups("")
 							if err != nil {
@@ -197,10 +245,73 @@ func Draw(v string) error {
 						}
 						InitSelector(logGroups)
 						mode = logGroup
+					case 'q':
+						optionInternal = option
+						InitSelector(queries)
+						setQueryIB(selector.index)
+						mode = query
 					}
 				}
 			}
 		}
 		redrawBase()
+	}
+}
+
+func setQuery(index int) {
+	var (
+		l int
+		d time.Duration
+		t time.Time
+	)
+	parseErr = nil
+	str := string(ib.runes)
+	switch index {
+	case qTime:
+		d, parseErr = time.ParseDuration(str)
+		if parseErr == nil {
+			optionInternal.Time = d
+		}
+	case qFields:
+		optionInternal.Query.Fields = str
+	case qSort:
+		optionInternal.Query.Sort = str
+	case qLimit:
+		l, parseErr = strconv.Atoi(str)
+		if parseErr == nil {
+			optionInternal.Query.Limit = l
+		}
+	case qAdditional:
+		optionInternal.Additional = str
+	case qStart:
+		t, parseErr = time.Parse(time.RFC3339, str)
+		if parseErr == nil {
+			optionInternal.Start = t
+		}
+	case qEnd:
+		t, parseErr = time.Parse(time.RFC3339, str)
+		if parseErr == nil {
+			optionInternal.End = t
+		}
+	}
+}
+
+func setQueryIB(index int) {
+	parseErr = nil
+	switch index {
+	case qTime:
+		ib.setString(optionInternal.Time.String())
+	case qFields:
+		ib.setString(optionInternal.Query.Fields)
+	case qSort:
+		ib.setString(optionInternal.Query.Sort)
+	case qLimit:
+		ib.setString(strconv.Itoa(optionInternal.Query.Limit))
+	case qAdditional:
+		ib.setString(optionInternal.Additional)
+	case qStart:
+		ib.setString(optionInternal.Start.Format(time.RFC3339))
+	case qEnd:
+		ib.setString(optionInternal.End.Format(time.RFC3339))
 	}
 }

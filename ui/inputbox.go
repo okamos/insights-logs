@@ -19,6 +19,14 @@ func (ib *InputBox) addRune(r rune) {
 	ib.cursor++
 }
 
+func (ib *InputBox) setString(s string) {
+	ib.clearText()
+	for _, r := range s {
+		ib.runes = append(ib.runes, r)
+		ib.cursor++
+	}
+}
+
 func (ib *InputBox) removeRune() {
 	l := len(ib.runes)
 	if l < 1 {

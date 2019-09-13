@@ -19,10 +19,11 @@ type Option struct {
 	Profile      string        `json:"profile"`
 	Region       string        `json:"region"`
 	LogGroupName string        `json:"log_group_name"`
-	Start        int64         `json:"start_time"`
-	End          int64         `json:"end_time"`
 	Time         time.Duration `json:"relative_time"`
 	Query        Query         `json:"query"`
+	Start        time.Time     `json:"-"`
+	End          time.Time     `json:"-"`
+	Additional   string        `json:"-"`
 }
 
 // Query used for build CloudWatch Logs Insights Insights Query

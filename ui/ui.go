@@ -8,6 +8,16 @@ const (
 	coldef = termbox.ColorDefault
 )
 
+const (
+	qTime = iota
+	qFields
+	qSort
+	qLimit
+	qAdditional
+	qStart
+	qEnd
+)
+
 var (
 	ib       InputBox
 	selector Selector
@@ -37,6 +47,15 @@ var (
 		"us-gov-east-1",
 		"us-gov-west-1",
 	}
+	queries = []string{
+		"relative time",
+		"fields",
+		"sort",
+		"limit",
+		"additional",
+		"start",
+		"end",
+	}
 )
 
 func tbFill(y, w int, bg termbox.Attribute) {
@@ -52,22 +71,22 @@ func tbPrint(x, y int, fg, bg termbox.Attribute, msg string) {
 	}
 }
 
-func tbBox(x1, y1, x2, y2 int, title string) {
+func tbBox(x1, y1, x2, y2 int, fg, bg termbox.Attribute, title string) {
 	if x1 > x2 || y1 > y2 {
 		return
 	}
 
 	for i := x1; i <= x2; i++ {
-		termbox.SetCell(i, y1, '-', coldef, coldef)
-		termbox.SetCell(i, y2, '-', coldef, coldef)
+		termbox.SetCell(i, y1, '-', fg, bg)
+		termbox.SetCell(i, y2, '-', fg, bg)
 	}
 	for i := y1 + 1; i < y2; i++ {
-		termbox.SetCell(x1, i, '|', coldef, coldef)
-		termbox.SetCell(x2, i, '|', coldef, coldef)
+		termbox.SetCell(x1, i, '|', fg, bg)
+		termbox.SetCell(x2, i, '|', fg, bg)
 	}
 	if title != "" {
 		for i, r := range title {
-			termbox.SetCell(x1+i+3, y1, r, coldef, coldef)
+			termbox.SetCell(x1+i+3, y1, r, fg, bg)
 		}
 	}
 }
