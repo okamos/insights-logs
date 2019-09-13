@@ -268,10 +268,17 @@ func Draw(v string) error {
 					InitSelector([]string{})
 					mode = base
 				}
+			case termbox.KeySpace:
+				switch mode {
+				case profile, region, logGroup, query:
+					ib.addRune(' ')
+				}
 			default:
 				switch mode {
 				case profile, region, logGroup, query:
-					ib.addRune(ev.Ch)
+					if ev.Ch != 0 {
+						ib.addRune(ev.Ch)
+					}
 					if mode == region || mode == logGroup {
 						selector.filter(string(ib.runes))
 					}
