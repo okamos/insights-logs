@@ -1,11 +1,10 @@
 ## Install dependencies
 setup:
-	dep version > /dev/null || curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-	dep check || dep ensure
+	go mod download
 
 build:
 	go fmt ./...
-	GOOS=$(PLATFORM) GOARCH=$(GOARCH) go build -o ezinsights cmd/ezinsigths/main.go
+	GOOS=$(PLATFORM) GOARCH=$(GOARCH) go build -o ezinsights cmd/ezinsights/main.go
 
 ## Analysis exec vet and lint
 analysis: setup

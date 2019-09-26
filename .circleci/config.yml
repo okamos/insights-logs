@@ -3,7 +3,7 @@ executors:
   default:
     working_directory: /go/src/github.com/okamos/insights-logs
     docker:
-      - image: circleci/golang:1.11.5
+      - image: circleci/golang:1.13.0
         environment:
           GOCACHE: "/tmp/go/cache"
 commands:
@@ -11,7 +11,7 @@ commands:
     steps:
       - restore_cache:
           keys:
-            - dep-cache-{{ checksum "Gopkg.lock" }}
+            - mod-{{ .Branch }}-{{ checksum "go.mod" }}
       - restore_cache:
           keys:
             - gocache-{{ .Branch }}
@@ -19,9 +19,10 @@ commands:
   save_dep_cache:
     steps:
       - save_cache:
-          key: dep-cache-{{ checksum "Gopkg.lock" }}
+          key: mod-{{ .Branch }}-{{ checksum "go.mod" }}
           paths:
-            - ./vendor
+            - /go/pkg/mod/cache
+            - /go/bin
   save_go_cache:
     steps:
       - save_cache:
