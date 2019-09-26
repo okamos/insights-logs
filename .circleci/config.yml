@@ -49,9 +49,7 @@ jobs:
     executor: default
     steps:
       - checkout
-      - restore_go_cache
       - run: curl -sL https://git.io/goreleaser | bash
-      - run: goreleaser
 workflows:
   version: 2
   flow:
